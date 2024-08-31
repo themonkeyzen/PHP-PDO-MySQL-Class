@@ -13,55 +13,37 @@
  */
 require(__DIR__ . '/PDO.Log.class.php');
 require(__DIR__ . '/PDO.Iterator.class.php');
-/** Class DB
- * @property PDO pdo PDO object
- * @property PDOStatement sQuery PDOStatement
- * @property PDOLog PDOLog logObject
- */
 class DB
 {
-	private $Host;
-	private $DBPort;
-	private $DBName;
-	private $DBUser;
-	private $DBPassword;
-	private $pdo;
-	private $sQuery;
-	private $connectionStatus = false;
-	private $logObject;
-	private $parameters;
-	public $rowCount   = 0;
-	public $columnCount   = 0;
-	public $querycount = 0;
+	private ?PDO $pdo;
+	private false|PDOStatement $sQuery;
+	private bool $connectionStatus = false;
+	private PDOLog $logObject;
+	private array $parameters;
+	public int $rowCount = 0;
+	public int $columnCount = 0;
+	public int $querycount = 0;
 
 
-	private $retryAttempt = 0; // 失败重试次数
+	private int $retryAttempt = 0;
 	const AUTO_RECONNECT = true;
-	const RETRY_ATTEMPTS = 3; // 最大失败重试次数
+	const RETRY_ATTEMPTS = 3;
 
-    /**
-     * DB constructor.
-     * @param $Host
-     * @param $DBPort
-     * @param $DBName
-     * @param $DBUser
-     * @param $DBPassword
-     */
-	public function __construct($Host, $DBPort, $DBName, $DBUser, $DBPassword)
-	{
+	public function __construct(
+        private readonly string $Host,
+        private readonly int    $DBPort,
+        private readonly string $DBName,
+        private readonly string $DBUser,
+        private readonly string $DBPassword
+    ) {
 		$this->logObject  = new PDOLog();
-		$this->Host       = $Host;
-		$this->DBPort     = $DBPort;
-		$this->DBName     = $DBName;
-		$this->DBUser     = $DBUser;
-		$this->DBPassword = $DBPassword;
-		$this->parameters = array();
+		$this->parameters = [];
 		$this->Connect();
 	}
 
 
-	private function Connect()
-	{
+	private function Connect(): void
+    {
 		try {
 			$dsn = 'mysql:';
 			$dsn .= 'host=' . $this->Host . ';';
@@ -73,27 +55,18 @@ class DB
 			$this->pdo = new PDO($dsn,
 				$this->DBUser,
 				$this->DBPassword,
-				array(
+				[
 					//For PHP 5.3.6 or lower
 					PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8",
 					PDO::ATTR_EMULATE_PREPARES => false,
 
-					//长连接
 					//PDO::ATTR_PERSISTENT => true,
 
 					PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 					PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
                     PDO::MYSQL_ATTR_FOUND_ROWS => true
-				)
+				]
 			);
-			/*
-			//For PHP 5.3.6 or lower
-			$this->pdo->setAttribute(PDO::MYSQL_ATTR_INIT_COMMAND, 'SET NAMES utf8');
-			$this->pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-			$this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-			//$this->pdo->setAttribute(PDO::ATTR_PERSISTENT, true);//长连接
-			$this->pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
-			*/
 			$this->connectionStatus = true;
 
 		}
@@ -102,8 +75,8 @@ class DB
 		}
 	}
 
-	private function SetFailureFlag()
-	{
+	private function SetFailureFlag(): void
+    {
 		$this->pdo = null;
 		$this->connectionStatus = false;
 	}
@@ -111,13 +84,13 @@ class DB
     /**
      * close pdo connection
      */
-	public function closeConnection()
-	{
+	public function closeConnection(): void
+    {
 		$this->pdo = null;
 	}
 
-	private function Init($query, $parameters = null, $driverOptions = array())
-	{
+	private function Init(string $query, array $parameters = null, array $driverOptions = []): void
+    {
 		if (!$this->connectionStatus) {
 			$this->Connect();
 		}
@@ -144,14 +117,14 @@ class DB
 			$this->querycount++;
 		}
 		catch (PDOException $e) {
-			$this->ExceptionLog($e, $this->BuildParams($query), 'Init', array('query' => $query, 'parameters' => $parameters));
+			$this->ExceptionLog($e, $this->BuildParams($query), 'Init', ['query' => $query, 'parameters' => $parameters]);
 
 		}
 
-		$this->parameters = array();
+		$this->parameters = [];
 	}
 
-	private function BuildParams($query, $params = null)
+	private function BuildParams(string $query, array $params = null)
 	{
 		if (!empty($params)) {
 			$array_parameter_found = false;
@@ -179,46 +152,30 @@ class DB
 		return $query;
 	}
 
-    /**
-     * @return bool
-     */
-	public function beginTransaction()
-	{
+	public function beginTransaction(): bool
+    {
 		return $this->pdo->beginTransaction();
 	}
 
-    /**
-     * @return bool
-     */
-	public function commit()
-	{
+	public function commit(): bool
+    {
 		return $this->pdo->commit();
 	}
 
-    /**
-     * @return bool
-     */
-	public function rollBack()
-	{
+	public function rollBack(): bool
+    {
 		return $this->pdo->rollBack();
 	}
 
-    /**
-     * @return bool
-     */
-	public function inTransaction()
-	{
+	public function inTransaction(): bool
+    {
 		return $this->pdo->inTransaction();
 	}
 
     /**
      * execute a sql query, returns an result array in the select operation, and returns the number of rows affected in other operations
-     * @param string $query
-     * @param null $params
-     * @param int $fetchMode
-     * @return array|int|null
      */
-	public function query($query, $params = null, $fetchMode = PDO::FETCH_ASSOC)
+	public function query(string $query, array $params = null, int $fetchMode = PDO::FETCH_ASSOC)
 	{
 		$query        = trim($query);
 		$rawStatement = preg_split("/( |\r|\n)/", $query);
@@ -235,16 +192,12 @@ class DB
 
     /**
      * execute a sql query, returns an iterator in the select operation, and returns the number of rows affected in other operations
-     * @param string $query
-     * @param null $params
-     * @param int $fetchMode
-     * @return int|null|PDOIterator
      */
-    public function iterator($query, $params = null, $fetchMode = PDO::FETCH_ASSOC)
+    public function iterator(string $query, array $params = null, int $fetchMode = PDO::FETCH_ASSOC): int|null|PDOIterator
     {
         $query        = trim($query);
         $rawStatement = preg_split("/( |\r|\n)/", $query);
-        $this->Init($query, $params, array(PDO::ATTR_CURSOR => PDO::CURSOR_SCROLL));
+        $this->Init($query, $params, [PDO::ATTR_CURSOR => PDO::CURSOR_SCROLL]);
         $statement = strtolower(trim($rawStatement[0]));
         if ($statement === 'select' || $statement === 'show' || $statement === 'call' || $statement === 'describe') {
             return new PDOIterator($this->sQuery, $fetchMode);
@@ -255,13 +208,8 @@ class DB
         }
     }
 
-    /**
-     * @param $tableName
-     * @param null $params
-     * @return bool|string
-     */
-	public function insert($tableName, $params = null)
-	{
+	public function insert(string $tableName, array $params = null): bool|string
+    {
 		$keys = array_keys($params);
 		$rowCount = $this->query(
 			'INSERT INTO `' . $tableName . '` (`' . implode('`,`', $keys) . '`)
@@ -281,12 +229,12 @@ class DB
      * @param array $params structure like [[colname1 => value1, colname2 => value2], [colname1 => value3, colname2 => value4]]
      * @return boolean success or not
      */
-    public function insertMulti($tableName, $params = array())
+    public function insertMulti(string $tableName, array $params = []): bool
     {
         $rowCount = 0;
         if (!empty($params)) {
             $insParaStr = '';
-            $insValueArray = array();
+            $insValueArray = [];
 
             foreach ($params as $addRow) {
                 $insColStr = implode('`,`', array_keys($addRow));
@@ -311,13 +259,13 @@ class DB
      * @param array $where
      * @return int affect rows
      */
-    public function update($tableName, $params = array(), $where = array())
+    public function update(string $tableName, array $params = [], array $where = [])
     {
         $rowCount = 0;
         if (!empty($params)) {
             $updColStr = '';
             $whereStr = '';
-            $updatePara = array();
+            $updatePara = [];
             // Build update statement
             foreach ($params as $key => $value) {
                 $updColStr .= "{$key}=?,";
@@ -341,22 +289,13 @@ class DB
         return $rowCount;
     }
 
-    /**
-     * @return string
-     */
-	public function lastInsertId()
-	{
+	public function lastInsertId(): string
+    {
 		return $this->pdo->lastInsertId();
 	}
 
-
-    /**
-     * @param $query
-     * @param null $params
-     * @return array
-     */
-	public function column($query, $params = null)
-	{
+	public function column(string $query, array $params = null): array
+    {
 		$this->Init($query, $params);
 		$resultColumn = $this->sQuery->fetchAll(PDO::FETCH_COLUMN);
 		$this->rowCount = $this->sQuery->rowCount();
@@ -365,13 +304,7 @@ class DB
 		return $resultColumn;
 	}
 
-    /**
-     * @param $query
-     * @param null $params
-     * @param int $fetchmode
-     * @return mixed
-     */
-	public function row($query, $params = null, $fetchmode = PDO::FETCH_ASSOC)
+	public function row(string $query, array $params = null, int $fetchmode = PDO::FETCH_ASSOC)
 	{
 		$this->Init($query, $params);
 		$resultRow = $this->sQuery->fetch($fetchmode);
@@ -381,12 +314,7 @@ class DB
 		return $resultRow;
 	}
 
-    /**
-     * @param $query
-     * @param null $params
-     * @return mixed
-     */
-	public function single($query, $params = null)
+	public function single(string $query, array $params = null)
 	{
 		$this->Init($query, $params);
 		return $this->sQuery->fetchColumn();
@@ -398,8 +326,8 @@ class DB
      * @param string $method
      * @param array $parameters
      */
-	private function ExceptionLog(PDOException $e, $sql = "", $method = '', $parameters = array())
-	{
+	private function ExceptionLog(PDOException $e, string $sql = "", string $method = '', array $parameters = []): void
+    {
 		$message = $e->getMessage();
 		$exception = 'Unhandled Exception. <br />';
 		$exception .= $message;
