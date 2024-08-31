@@ -13,6 +13,13 @@
  */
 require(__DIR__ . '/PDO.Log.class.php');
 require(__DIR__ . '/PDO.Iterator.class.php');
+
+enum DBDriver: string
+{
+    case MySQL = 'mysql';
+    case PostgreSQL = 'pgsql';
+}
+
 class DB
 {
 	private ?PDO $pdo;
@@ -34,7 +41,8 @@ class DB
         private readonly int    $DBPort,
         private readonly string $DBName,
         private readonly string $DBUser,
-        private readonly string $DBPassword
+        private readonly string $DBPassword,
+        private readonly DBDriver $DBDriver = DBDriver::MySQL
     ) {
 		$this->logObject  = new PDOLog();
 		$this->parameters = [];
@@ -42,38 +50,32 @@ class DB
 	}
 
 
-	private function Connect(): void
+    private function Connect(): void
     {
-		try {
-			$dsn = 'mysql:';
-			$dsn .= 'host=' . $this->Host . ';';
-			$dsn .= 'port=' . $this->DBPort . ';';
-			if (!empty($this->DBName)) {
-				$dsn .= 'dbname=' . $this->DBName . ';';
-			}
-			$dsn .= 'charset=utf8;';
-			$this->pdo = new PDO($dsn,
-				$this->DBUser,
-				$this->DBPassword,
-				[
-					//For PHP 5.3.6 or lower
-					PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8",
-					PDO::ATTR_EMULATE_PREPARES => false,
+        try {
+            $dsn = match ($this->DBDriver) {
+                DBDriver::MySQL => "mysql:host={$this->Host};port={$this->DBPort};dbname={$this->DBName};charset=utf8;",
+                DBDriver::PostgreSQL => "pgsql:host={$this->Host};port={$this->DBPort};dbname={$this->DBName};",
+            };
 
-					//PDO::ATTR_PERSISTENT => true,
+            $this->pdo = new PDO(
+                $dsn,
+                $this->DBUser,
+                $this->DBPassword,
+                [
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_PERSISTENT => false,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+                ]
+            );
 
-					PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-					PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
-                    PDO::MYSQL_ATTR_FOUND_ROWS => true
-				]
-			);
-			$this->connectionStatus = true;
+            $this->connectionStatus = true;
 
-		}
-		catch (PDOException $e) {
-			$this->ExceptionLog($e, '', 'Connect');
-		}
-	}
+        } catch (PDOException $e) {
+            $this->ExceptionLog($e, '', 'Connect');
+        }
+    }
 
 	private function SetFailureFlag(): void
     {
