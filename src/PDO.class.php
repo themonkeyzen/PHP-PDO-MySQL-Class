@@ -38,7 +38,7 @@ class DB
 
 	public function __construct(
         private readonly string $Host,
-        private readonly int    $DBPort,
+        private readonly int|string $DBPort,
         private readonly string $DBName,
         private readonly string $DBUser,
         private readonly string $DBPassword,
