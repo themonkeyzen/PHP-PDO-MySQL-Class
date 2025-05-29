@@ -97,7 +97,7 @@ class DB
 			$this->Connect();
 		}
 		try {
-			$this->parameters = $parameters;
+			$this->parameters = $parameters ?? [];
 			$this->sQuery     = $this->pdo->prepare($this->BuildParams($query, $this->parameters), $driverOptions);
 
 			if (!empty($this->parameters)) {
